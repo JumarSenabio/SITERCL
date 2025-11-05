@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Circuitos RLC - IFMT</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.9.0/math.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+body { font-family: 'Inter', sans-serif; background: #e9f5eb; color: #022a11; }
+header { background:#006837; color:#fff; padding:18px 0 14px 0; font-size:2.2rem; font-weight:700; text-align:center; box-shadow:0 5px 16px #b8e2cc; letter-spacing:.4px; }
+.result-card { background-color: #c9e8d4; border: 1.6px solid #01724c; border-radius: 0.55rem; padding: 1.1rem; font-weight:600; }
+.result-card .value { font-size: 1.15rem; font-weight: 700; color: #008c5b; }
+.result-card .label { font-size: 0.9rem; color: #095d3b; }
+canvas { background-color: #def7e8; border-radius: 0.5rem; border: 2px solid #008c5b; }
+.ifmt-btn { background-color:#006837; color:#fff; padding:12px 0; font-weight:700; font-size:18px; border:none; border-radius:7px; transition:background .2s; cursor:pointer; width:100%; }
+.ifmt-btn:hover { background: #00936a; }
+#phasorChart { background-color: #def7e8; border-radius: 0.5rem; border: 2px solid #008c5b; min-height: 500px; }
+</style>
+</head>
+<body class="p-4 md:p-8">
+<header>SIMULADOR DE CIRCUITOS RLC E MISTOS - IFMT</header>
+<div class="max-w-7xl mx-auto">
+<main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Controle -->
+<div class="lg:col-span-1 space-y-8">
+<div class="control-panel bg-[#b8e2cc] p-6 rounded-lg shadow-lg">
+<h2 class="text-2xl font-semibold mb-6 border-b border-[#01724c] pb-3 text-[#006837]">Controles</h2>
+<form id="paramForm" autocomplete="off">
+<div class="space-y-4">
+<div>
+<label for="circuitType" class="block mb-2 font-semibold text-[#006837]">Tipo de Circuito</label>
+<select id="circuitType" class="w-full p-2 rounded border-2 border-[#008c5b]">
+<option value="" selected disabled hidden>Selecione</option>
+<option value="R">Resistivo (R)</option>
+<option value="RL">RL Série</option>
+<option value="RC">RC Série</option>
+<option value="RLC">RLC Série</option>
+<option value="RLC-paralelo">RLC Paralelo</option>
+<option value="misto1">Misto RL paralelo C</option>
+</select>
+</div>
+<h3 class="text-lg font-semibold pt-4 border-t border-[#01724c] text-[#006837]">Fonte AC</h3>
+<div>
+<label for="voltage" class="block mb-2 font-semibold text-[#006837]">Tensão Pico (V)</label>
+<input type="number" id="voltage" min="0" step="any" value="" placeholder="ex: 220" class="w-full p-2 rounded border-2 border-[#008c5b]">
+</div>
+<div>
+<label for="frequency" class="block mb-2 font-semibold text-[#006837]">Frequência (Hz)</label>
+<input type="number" id="frequency" min="0" step="any" value="" placeholder="ex: 60" class="w-full p-2 rounded border-2 border-[#008c5b]">
+</div>
+<h3 class="text-lg font-semibold pt-4 border-t border-[#01724c] mb-3 text-[#006837]">Componentes</h3>
+<div id="resistor-group">
+<label for="resistance" class="block mb-2 font-semibold text-[#006837]">Resistência (Ω)</label>
+<input type="number" id="resistance" min="0" step="any" value="" placeholder="ex: 100" class="w-full p-2 rounded border-2 border-[#008c5b]">
+</div>
+<div id="inductor-group">
+<label for="inductance" class="block mb-2 font-semibold text-[#006837]">Indutância (mH)</label>
+<input type="number" id="inductance" min="0" step="any" value="" placeholder="ex: 0.5" class="w-full p-2 rounded border-2 border-[#008c5b]">
+</div>
+<div id="capacitor-group">
+<label for="capacitance" class="block mb-2 font-semibold text-[#006837]">Capacitância (µF)</label>
+<input type="number" id="capacitance" min="0" step="any" value="" placeholder="ex: 25" class="w-full p-2 rounded border-2 border-[#008c5b]">
+</div>
+<button id="calcBtn" type="submit" class="ifmt-btn mt-5">Calcular</button>
+</div>
+</form>
+</div>
+</div>
+<!-- Resultados e Gráficos -->
+<div class="lg:col-span-2 space-y-8">
+<div>
+<h2 class="text-2xl font-semibold mb-4 text-[#006837]">Resultados</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+  <div class="result-card"><div id="impedance" class="value">---</div><div class="label">Impedância (Z)</div></div>
+  <div class="result-card"><div id="peakCurrent" class="value">---</div><div class="label">Corrente Pico (Ip)</div></div>
+  <div class="result-card"><div id="rmsCurrent" class="value">---</div><div class="label">Corrente RMS (Irms)</div></div>
+  <div class="result-card"><div id="phaseAngle" class="value">---</div><div class="label">Ângulo de Fase (θ)</div></div>
+  <div class="result-card"><div id="powerFactor" class="value">---</div><div class="label">Fator de Potência</div></div>
+  <div class="result-card"><div id="xl" class="value">---</div><div class="label">Reatância Indutiva (XL)</div></div>
+  <div class="result-card"><div id="xc" class="value">---</div><div class="label">Reatância Capacitiva (XC)</div></div>
+  <div class="result-card"><div id="apparentPower" class="value">---</div><div class="label">Potência Aparente (S) [VA]</div></div>
+  <div class="result-card"><div id="activePower" class="value">---</div><div class="label">Potência Ativa (P) [W]</div></div>
+  <div class="result-card"><div id="reactivePower" class="value">---</div><div class="label">Potência Reativa (Q) [VAR]</div></div>
+</div>
+</div>
+<div class="space-y-8">
+<div>
+<h2 class="text-2xl font-semibold text-[#005b38] mb-3">Formas de Onda (Canvas Animado)</h2>
+<div class="w-full flex justify-center">
+<canvas id="waveCanvas" width="650" height="130"></canvas>
+</div>
+<div class="text-xs text-[#006837] mt-2 ml-4">Azul: tensão | Vermelho: corrente</div>
+</div>
+<div>
+<h2 class="text-2xl font-semibold mb-4 text-[#005b38]">Triângulo de Potência</h2>
+<canvas id="powerTriangleChart"></canvas>
+</div>
+<div>
+<h2 class="text-2xl font-semibold mb-4 text-[#005b38]">Diagrama Fasorial</h2>
+<div id="phasorChart"></div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<script>
+document.getElementById('paramForm').addEventListener('submit', function(e){
+e.preventDefault();
+let tipo = document.getElementById('circuitType').value;
+let Vp = document.getElementById('voltage').value;
+let f = document.getElementById('frequency').value;
+let R = document.getElementById('resistance').value;
+let L = document.getElementById('inductance').value;
+let C = document.getElementById('capacitance').value;
+if (!tipo || Vp==="" || f==="" || R==="" || L==="" || C==="") {
+  alert("Preencha todos os campos!");
+  return;
+}
+Vp = parseFloat(Vp); f=parseFloat(f); R=parseFloat(R); L=parseFloat(L); C=parseFloat(C);
+let l = L/1000, c = C/1e6, omega = 2*Math.PI*f;
+let XL=0, XC=0, Z, Zmod=0, phi=0;
+if(tipo==="RL"){
+  XL=omega*l;
+  Z=math.complex(R,XL);
+  XC=0;
+}
+else if(tipo==="RC"){
+  XC=c>0?1/(omega*c):0;
+  Z=math.complex(R,-XC);
+  XL=0;
+}
+else if(tipo==="RLC"){
+  XL=omega*l;
+  XC=c>0?1/(omega*c):0;
+  Z=math.complex(R,XL-XC);
+}
+else if(tipo==="RLC-paralelo"){
+  XL=omega*l;
+  XC=c>0?1/(omega*c):0;
+  const ZR=math.complex(R,0);
+  const ZL=math.complex(0, XL);
+  const ZC=math.complex(0, -XC);
+  const Y_tot=math.add(math.add(math.divide(1,ZR),math.divide(1,ZL)),math.divide(1,ZC));
+  Z=math.divide(1,Y_tot);
+}
+else if(tipo==="misto1"){
+  XL=omega*l;
+  XC=c>0?1/(omega*c):0;
+  const ZRL=math.complex(R, XL);
+  const ZC=math.complex(0, -XC);
+  const Y_tot=math.add(math.divide(1,ZRL),math.divide(1,ZC));
+  Z=math.divide(1,Y_tot);
+}
+else{
+  Z=math.complex(R,0);
+  XL=0;
+  XC=0;
+}
+Zmod=math.abs(Z);
+phi=math.arg(Z);
+let phaseDeg = phi*180/Math.PI;
+let Ip = Zmod>0 ? Vp/Zmod : 0;
+let fp = Math.cos(phi);
+document.getElementById('impedance').textContent = `${Zmod.toFixed(2)} Ω`;
+document.getElementById('peakCurrent').textContent = `${Ip.toFixed(3)} A`;
+let Irms = Ip / Math.sqrt(2);
+document.getElementById('rmsCurrent').textContent = `${Irms.toFixed(3)} A`;
+document.getElementById('phaseAngle').textContent = `${phaseDeg.toFixed(2)}°`;
+document.getElementById('powerFactor').textContent = `${fp.toFixed(2)}`;
+document.getElementById('xl').textContent = `${XL.toFixed(2)} Ω`;
+document.getElementById('xc').textContent = `${XC.toFixed(2)} Ω`;
+let Vrms = Vp / Math.sqrt(2);
+let S = Vrms * Irms;
+let P = S * fp;
+let Q = S * Math.sin(phi);
+document.getElementById('apparentPower').textContent = `${S.toFixed(2)} VA`;
+document.getElementById('activePower').textContent = `${P.toFixed(2)} W`;
+document.getElementById('reactivePower').textContent = `${Q.toFixed(2)} VAR`;
+// Onda animada
+if(window.animateWaves) cancelAnimationFrame(window.animateWaves); onda_animada(Vp,Ip,f,phi);
+// Triângulo de Potência
+if(window.powerChart) window.powerChart.destroy();
+window.powerChart = new Chart(document.getElementById('powerTriangleChart').getContext('2d'), {
+  type:'scatter',
+  data:{datasets:[
+    {label:'P (Potência Ativa)',data:[{x:P,y:0}],pointBackgroundColor:'#008c5b',pointRadius:12},
+    {label:'S (Potência Aparente)',data:[{x:0,y:0},{x:P,y:Q}],showLine:true,borderColor:'#325a3b',borderWidth:4,pointRadius:8,pointBackgroundColor:'#325a3b'},
+    {label:'Q (Potência Reativa)',data:[{x:P,y:Q}],pointBackgroundColor:'#e8ad24',pointRadius:12}
+  ]},
+  options:{
+    scales:{
+      x:{title:{display:true,text:'P (W)',color:'#01724c',font:{size:14,weight:'600'}},ticks:{color:'#01724c'},grid:{color:'#b8e2cc'}},
+      y:{title:{display:true,text:'Q (VAR)',color:'#01724c',font:{size:14,weight:'600'}},ticks:{color:'#01724c'},grid:{color:'#b8e2cc'}}
+    },
+    plugins:{
+      legend:{labels:{color:'#006837',font:{weight:'600',size:12}}},
+      tooltip:{enabled:true}
+    },
+    responsive:true, maintainAspectRatio:true
+  }
+});
+// Diagrama Fasorial (Plotly)
+let VR = Ip * R;
+let VL = Ip * XL;
+let VC = Ip * XC;
+criarDiagramaFasorial(Ip, VR, VL, VC, Vp, phi, XL, XC);
+});
+function criarDiagramaFasorial(Ip, VR, VL, VC, Vp, phi, XL, XC) {
+  let traces = [];
+  traces.push({ x: [0, Ip], y: [0, 0], mode: 'lines+markers', name: 'Corrente (I)', line: { color: '#d03c23', width: 5 }, marker: { size: 10, color: '#d03c23' } });
+  traces.push({ x: [0, VR], y: [0, 0], mode: 'lines+markers', name: 'V<sub>R</sub> (Resistor)', line: { color: '#e69125', width: 4 }, marker: { size: 8, color: '#e69125' } });
+  if(Math.abs(VL) > 1e-7) traces.push({ x: [0, 0], y: [0, VL], mode: 'lines+markers', name: 'V<sub>L</sub> (Indutor)', line: { color: '#4464fd', width: 4 }, marker: { size: 8, color: '#4464fd' } });
+  if(Math.abs(VC) > 1e-7) traces.push({ x: [0, 0], y: [0, -VC], mode: 'lines+markers', name: 'V<sub>C</sub> (Capacitor)', line: { color: '#e01e32', width: 4 }, marker: { size: 8, color: '#e01e32' } });
+  let vtx = VR;
+  let vty = VL - VC;
+  traces.push({ x: [0, vtx], y: [0, vty], mode: 'lines+markers', name: 'Tensão Total (V)', line: { color: '#17ac65', width: 6 }, marker: { size: 12, color: '#17ac65' } });
+  let allVals = [Ip, VR, Math.abs(vtx), Math.abs(vty), Math.abs(VL), Math.abs(VC)].map(Math.abs);
+  let maxVal = Math.max(...allVals) * 1.25;
+  if(maxVal < 1) maxVal = 10;
+  let layout = {
+    title: { text: 'Diagrama Fasorial de Tensões e Corrente', font: { size: 16, color: '#006837', family: 'Inter' } },
+    xaxis: { title: 'Componente Real (Re)', zeroline: true, zerolinecolor: '#01724c', zerolinewidth: 2, gridcolor: '#b8e2cc', range: [-maxVal*0.2, maxVal] },
+    yaxis: { title: 'Componente Imaginária (Im)', zeroline: true, zerolinecolor: '#01724c', zerolinewidth: 2, gridcolor: '#b8e2cc', range: [-maxVal, maxVal], scaleanchor: 'x', scaleratio: 1 },
+    plot_bgcolor: '#def7e8', paper_bgcolor: '#def7e8', showlegend: true,
+    legend: { x: 1.02, y: 1, font: { size: 11, color: '#006837', family: 'Inter' } },
+    margin: { l: 60, r: 150, t: 60, b: 60 }
+  };
+  let config = { responsive: true, displayModeBar: true, displaylogo: false, modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'] };
+  Plotly.newPlot('phasorChart', traces, layout, config);
+}
+function onda_animada(V,Ip,f,phi){
+    let ctx = document.getElementById('waveCanvas').getContext('2d');
+    let width = ctx.canvas.width, height = ctx.canvas.height, cy = height/2;
+    let ampV = height*0.38, ampI = height*0.34;
+    let offset=0;
+    function frame(){
+        ctx.clearRect(0,0,width,height);
+        ctx.save();
+        ctx.strokeStyle="#b8e2cc";
+        ctx.lineWidth=1.1;
+        for(let x=0;x<=width;x+=65){
+          ctx.beginPath();
+          ctx.moveTo(x,0);
+          ctx.lineTo(x,height);
+          ctx.stroke();
+        }
+        for(let y=0;y<=height;y+=29){
+          ctx.beginPath();
+          ctx.moveTo(0,y);
+          ctx.lineTo(width,y);
+          ctx.stroke();
+        }
+        ctx.restore();
+        ctx.beginPath();
+        ctx.strokeStyle="#0069d6";
+        ctx.lineWidth=2.9;
+        for(let x=0;x<width;x++){
+            let t = ((x+offset)/width)*2*Math.PI;
+            let y = cy - ampV * Math.sin(t);
+            if(x===0)ctx.moveTo(x,y);
+            else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.strokeStyle="#d03c23";
+        ctx.lineWidth=2.8;
+        for(let x=0;x<width;x++){
+            let t = ((x+offset)/width)*2*Math.PI;
+            let y = cy - ampI * Math.sin(t-phi);
+            if(x===0)ctx.moveTo(x,y);
+            else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+        ctx.font='16px Inter';
+        ctx.fillStyle="#006837";
+        ctx.fillText('Tensão (V)', 34, 23);
+        ctx.fillStyle="#e01e32";
+        ctx.fillText('Corrente (I)', 180, 23);
+        offset += 3.7;
+        window.animateWaves = requestAnimationFrame(frame);
+    }
+    frame();
+}
+</script>
+</body>
+</html>
