@@ -298,8 +298,8 @@
     L = parseFloat(L);
     C = parseFloat(C);
 
-    let l = L / 1000;
-    let c = C / 1e6;
+    let l = L / 1000; // mH to H
+    let c = C / 1e6;  // uF to F
     let omega = 2 * Math.PI * f;
     let XL = 0,
       XC = 0,
@@ -446,10 +446,16 @@
       }
     );
 
-    // Diagrama Fasorial (Plotly)
+    // Calcular tensões parciais para o fasor
     let VR = Ip * R;
     let VL = Ip * XL;
     let VC = Ip * XC;
+
+    // Calcular fasor da corrente (Ip em fase zero)
+    let I_real = Ip * Math.cos(0);
+    let I_imag = Ip * Math.sin(0);
+
+    // Chamar função que desenha o diagrama fasorial com correntes visíveis
     criarDiagramaFasorial(Ip, VR, VL, VC, Vp, phi, XL, XC);
   });
 
